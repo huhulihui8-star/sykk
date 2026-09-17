@@ -53,7 +53,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {process.env.NEXT_PUBLIC_STATIC_EXPORT === '1' && <div className="border-b border-white/10 bg-slate-900 px-4 py-2 text-center text-xs text-slate-400">GitHub Pages 定时生成版 · 计划每 30 分钟更新，任务可能延迟 · 请核对行情时间 · 不提供实时 API 或 MCP</div>}
+        {process.env.NEXT_PUBLIC_STATIC_EXPORT === '1' && <div className="border-b border-white/10 bg-slate-900 px-4 py-2 text-center text-xs text-slate-400">v11 新闻衰减与事件去重 · 准确率尚待留档验证 · GitHub Pages 每 30 分钟计划更新，任务可能延迟 · 请核对行情时间 · 不提供实时 API 或 MCP</div>}
         {children}
       </body>
     </html>

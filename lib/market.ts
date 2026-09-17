@@ -1,3 +1,4 @@
+import { prepareNewsEvidence, newsTimeWeight } from './news-evidence.ts';
 import { SESSION_WINDOWS, EXCHANGE_CALENDARS, calendarCoverage, sessionForCode, localClock, sessionClose, shiftDate } from './market-calendar.ts';
 import { readSourceBody, withSourceDiagnostics, reserveSourceCacheCall, type SourceDiagnostic } from './source-cache.ts';
 
@@ -122,6 +123,9 @@ export type MarketSnapshot = {
     newsWeight: number;
     technicalWeight: number;
     modelVersion: string;
+    validationStatus?: 'UNVALIDATED';
+    newsHalfLifeHours?: number;
+    newsMaxAgeHours?: number;
     modelStatus: 'validated' | 'fallback';
   };
 };
@@ -1248,7 +1252,7 @@ async function fetchNewsColumn(column: 350 | 351): Promise<NewsEvent[]> {
       title: row.title ?? '未命名资讯',
       summary: row.summary ?? '',
       source: row.mediaName ?? '东方财富资讯',
-      publishedAt: toIso(row.showTime, new Date().toISOString()),
+      publishedAt: toIso(row.showTime, ''),
       url: row.uniqueUrl ?? row.url ?? '',
       tone: toneFor(text),
       kind,
@@ -1279,7 +1283,7 @@ async function fetchNotices(): Promise<NewsEvent[]> {
         title,
         summary: company ? `${company}发布最新公告` : '上市公司最新公告',
         source: company || '上市公司公告',
-        publishedAt: toIso(row.display_time, new Date().toISOString()),
+        publishedAt: toIso(row.display_time, ''),
         url: row.art_code
           ? `https://data.eastmoney.com/notices/detail/${row.codes?.[0]?.stock_code ?? ''}/${row.art_code}.html`
           : '',
@@ -1823,7 +1827,7 @@ async function fetchUsMainstreamNews(
               title,
               summary: description.slice(0, 160),
               source,
-              publishedAt: xmlTag(block, 'pubDate') || new Date().toISOString(),
+              publishedAt: xmlTag(block, 'pubDate') || '',
               url: xmlTag(block, 'link'),
               tone: toneFor(title),
               kind: '美国财经' as const,
@@ -1879,7 +1883,7 @@ async function fetchForeignChinaAnalysis(
                 description.slice(0, 160) ||
                 '海外媒体与机构对中国经济及产业的公开分析',
               source,
-              publishedAt: xmlTag(block, 'pubDate') || new Date().toISOString(),
+              publishedAt: xmlTag(block, 'pubDate') || '',
               url: xmlTag(block, 'link'),
               tone: toneFor(title),
               kind: '海外看中国' as const,
@@ -1909,7 +1913,7 @@ async function fetchSecFilings(): Promise<NewsEvent[]> {
         title,
         summary: 'SEC EDGAR 公开披露',
         source: 'U.S. SEC',
-        publishedAt: xmlTag(block, 'updated') || new Date().toISOString(),
+        publishedAt: xmlTag(block, 'updated') || '',
         url: decodeXml(href),
         tone: toneFor(title),
         kind: 'SEC披露' as const,
@@ -1967,7 +1971,6 @@ async function fetchCnFlashNews(): Promise<NewsEvent[]> {
       { Referer: 'https://wallstreetcn.com/' },
     ),
   ]);
-  const nowIso = new Date().toISOString();
   const events: NewsEvent[] = [];
   if (sina.status === 'fulfilled') {
     for (const [index, row] of (
@@ -1980,7 +1983,7 @@ async function fetchCnFlashNews(): Promise<NewsEvent[]> {
         title: text.slice(0, 90),
         summary: text,
         source: '新浪财经 7x24',
-        publishedAt: toIso(row.create_time, nowIso),
+        publishedAt: toIso(row.create_time, ''),
         url: 'https://finance.sina.com.cn/7x24/',
         tone: toneFor(text),
         kind: '市场快讯',
@@ -2002,7 +2005,7 @@ async function fetchCnFlashNews(): Promise<NewsEvent[]> {
         source: '华尔街见闻',
         publishedAt: row.display_time
           ? new Date(row.display_time * 1000).toISOString()
-          : nowIso,
+          : '',
         url: row.uri ?? 'https://wallstreetcn.com/live/global',
         tone: toneFor(text),
         kind: '市场快讯',
@@ -2043,7 +2046,6 @@ async function fetchResearchReports(days = 7): Promise<NewsEvent[]> {
     12000,
     { Referer: 'https://data.eastmoney.com/report/' },
   );
-  const nowIso = new Date().toISOString();
   return (json.data ?? [])
     .flatMap((row, index) => {
       const title = (row.title ?? '').trim();
@@ -2060,7 +2062,7 @@ async function fetchResearchReports(days = 7): Promise<NewsEvent[]> {
             .filter(Boolean)
             .join(' · '),
           source: (row.orgSName ?? '').trim() || '东方财富研报',
-          publishedAt: toIso(row.publishDate, nowIso),
+          publishedAt: toIso(row.publishDate, ''),
           url: row.infoCode
             ? `https://data.eastmoney.com/report/zw_industry.jshtml?infocode=${row.infoCode}`
             : '',
@@ -2312,8 +2314,9 @@ export function capPerSource(events: NewsEvent[], maxPerSource: number) {
   return out;
 }
 
-function scoreEvidence(events: NewsEvent[]) {
+function scoreEvidence(events: NewsEvent[], now: number) {
   let impact = 0;
+  let totalWeight = 0;
   for (const event of diversifyBySource(events)) {
     const direction =
       event.tone === '正向' ? 1 : event.tone === '负向' ? -1 : 0;
@@ -2324,23 +2327,26 @@ function scoreEvidence(events: NewsEvent[]) {
         : event.kind === '机构研报'
           ? 0.8
           : 1;
-    impact += direction * sourceWeight;
+    const weight = sourceWeight * newsTimeWeight(event, now);
+    impact += direction * weight;
+    totalWeight += weight;
   }
-  return round(clamp(50 + impact * 6.5));
+  return round(clamp(50 + (totalWeight ? impact / totalWeight : 0) * 25));
 }
 
 /**
- * 证据置信度（0~1）：条数与来源数各占一半权重。
+ * 证据置信度（0~1）：时间衰减后的条数与来源多样性取几何平均。
  * 用它把信息面分数往中性 50 拉——样本稀薄时给出一个「看起来很像概率」的数字，
  * 比给出中性值更容易误导人。这个系数会如实显示在页面上。
  */
-export function evidenceConfidence(events: NewsEvent[]) {
-  const byCount = Math.min(events.length / 12, 1);
+export function evidenceConfidence(events: NewsEvent[], now?: number) {
+  const effectiveCount = now === undefined ? events.length : events.reduce((sum, event) => sum + newsTimeWeight(event, now), 0);
+  const byCount = Math.min(effectiveCount / 12, 1);
   const bySources = Math.min(
     new Set(events.map((event) => event.source)).size / MIN_DISTINCT_SOURCES,
     1,
   );
-  return Math.round((byCount * 0.5 + bySources * 0.5) * 1000) / 1000;
+  return Math.round(Math.sqrt(byCount * bySources) * 1000) / 1000;
 }
 
 /**
@@ -2370,11 +2376,12 @@ function eventScore(
   events: NewsEvent[],
   sector: SectorDefinition,
   region: MarketRegion,
+  now: number,
 ) {
-  const relevant = events
+  const relevant = prepareNewsEvidence(events, now)
     .filter((event) => event.sectors.includes(sector.code))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  const confidence = evidenceConfidence(relevant);
+  const confidence = evidenceConfidence(relevant, now);
   const sources = new Set(relevant.map((event) => event.source)).size;
   if (region === 'CN') {
     const foreign = relevant.filter((event) => event.kind === '海外看中国');
@@ -2384,8 +2391,8 @@ function eventScore(
       .slice(0, 5);
     return {
       score: weightedChinaEvidenceScore(
-        scoreEvidence(foreign),
-        scoreEvidence(domestic),
+        scoreEvidence(foreign, now),
+        scoreEvidence(domestic, now),
         foreign.length,
         domestic.length,
       ),
@@ -2395,7 +2402,7 @@ function eventScore(
     };
   }
   return {
-    score: scoreEvidence(relevant),
+    score: scoreEvidence(relevant, now),
     evidence: relevant.slice(0, 4),
     evidenceMix: { foreign: relevant.length, domestic: 0, sources },
     confidence,
@@ -2410,7 +2417,7 @@ export function buildSector(
   freshness: QuoteFreshness,
 ): SectorSnapshot {
   const market = boardMetrics(sector, boards);
-  const news = eventScore(events, sector, region);
+  const news = eventScore(events, sector, region, Date.parse(freshness.receivedAt));
   // 证据稀薄（条数少或来源集中）时把信息面分数往中性 50 拉。
   // 样本只有 2 条却报出「78% 看多」，是这套模型最容易误导人的输出。
   const newsScore = round(50 + (news.score - 50) * news.confidence);
@@ -2682,7 +2689,7 @@ async function buildMarketSnapshot(): Promise<MarketSnapshot> {
     ],
     proxyDisclosure:
       '美股 11 个行业采用 XLE、XLF、XLK 等行业 ETF 作为行业代理；标普500、纳斯达克、纳斯达克100、道琼斯、恒生、KOSPI、台湾加权、日经225、DAX、富时100 为指数本身点位；罗素2000 因东方财富未提供该指数，改用 IWM（罗素2000 ETF）代理，与行业 ETF 同类处理。指数与 ETF 都没有「成分股涨跌家数」，这类标的的广度项按中性处理，不用 ETF 自身涨跌方向去伪造广度。',
-    analysisEvidence: [...cnEvents, ...usEvents, ...indexEvents],
+    analysisEvidence: [...prepareNewsEvidence(cnEvents, Date.parse(now)), ...prepareNewsEvidence(usEvents, Date.parse(now)), ...prepareNewsEvidence(indexEvents, Date.parse(now))],
     events: [
       ...capPerSource(foreignChinaEvents, DISPLAY_MAX_PER_SOURCE).slice(0, 20),
       ...capPerSource(usEvents, DISPLAY_MAX_PER_SOURCE).slice(0, 30),
@@ -2692,7 +2699,10 @@ async function buildMarketSnapshot(): Promise<MarketSnapshot> {
     methodology: {
       newsWeight: 0.65,
       technicalWeight: 0.35,
-      modelVersion: 'provider-split-direction-share-v10',
+      modelVersion: 'time-decay-deduplicated-direction-v11',
+      validationStatus: 'UNVALIDATED',
+      newsHalfLifeHours: 24,
+      newsMaxAgeHours: 168,
       modelStatus:
         fetchedEvents.length || usEvents.length ? 'validated' : 'fallback',
     },

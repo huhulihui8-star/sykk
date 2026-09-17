@@ -361,7 +361,7 @@ test('评分会按来源做配额，避免单一媒体主导信息面', () => {
   assert.equal(diversifyBySource(diversified).length, 9);
   assert.ok(evidenceConfidence(diversified) > evidenceConfidence(dominated));
   assert.equal(evidenceConfidence([]), 0);
-  assert.equal(evidenceConfidence(diversified), 0.875);
+  assert.equal(evidenceConfidence(diversified), 0.866);
 });
 
 test('一级与二级页面使用可靠的原生导航', () => {
@@ -491,7 +491,7 @@ test('证据稀薄时信息面分数被拉向中性，并如实给出置信度',
     title: `电子行业订单回暖 ${index}`,
     summary: '',
     source,
-    publishedAt: '2026-09-11T00:00:00.000Z',
+    publishedAt: testFreshness.receivedAt,
     url: '',
     tone: '正向',
     kind: '国内经济',

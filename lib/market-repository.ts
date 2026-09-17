@@ -92,7 +92,7 @@ function isCompatible(snapshot: MarketSnapshot) {
     snapshot.freshness?.US &&
     snapshot.freshness?.INDEX &&
     Array.isArray(snapshot.providerStatus) &&
-    snapshot.methodology?.modelVersion === 'provider-split-direction-share-v10' &&
+    snapshot.methodology?.modelVersion === 'time-decay-deduplicated-direction-v11' &&
     snapshot.diagnostics && snapshot.indexes.every(item => item.freshness.session) &&
     [...snapshot.sectors, ...snapshot.usSectors, ...snapshot.indexes].every(
       (sector) =>
