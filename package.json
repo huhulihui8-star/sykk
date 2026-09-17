@@ -18,7 +18,8 @@
     "forecast:watch": "node --experimental-strip-types scripts/forecast-scheduler.mjs",
     "preview:persistent": "node scripts/preview-persistent.mjs",
     "serve:persistent": "node scripts/serve-persistent.mjs",
-    "pages:export": "node --experimental-strip-types scripts/export-pages.mjs"
+    "pages:export": "node --experimental-strip-types scripts/export-pages.mjs",
+    "accounts:owner": "node --experimental-strip-types scripts/create-owner.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

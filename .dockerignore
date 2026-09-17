@@ -15,3 +15,7 @@ dist
 *.tar.gz
 *.tsbuildinfo
 .wbapp_*.genie
+
+.private
+state
+out

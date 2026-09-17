@@ -279,6 +279,8 @@ export function MarketDashboard({
               方法与边界
             </a>
             <a href={sitePath('/evaluation/')} className="px-2 py-1 hover:text-cyan-300">评估</a>
+            <a href={sitePath('/account/')} className="px-2 py-1 hover:text-cyan-300">注册 / 登录</a>
+            <a href={sitePath('/admin/')} className="px-2 py-1 hover:text-cyan-300">管理后台</a>
       </nav>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Clock3 className="size-3.5" />
@@ -303,6 +305,7 @@ export function MarketDashboard({
         <a href="#sectors" className="px-2 py-1 hover:text-cyan-300">
           行业
         </a>
+        <a href={sitePath('/account/')} className="px-2 py-1 hover:text-cyan-300">账号</a>
         <a href="#methodology" className="px-2 py-1 hover:text-cyan-300">
           方法
         </a>

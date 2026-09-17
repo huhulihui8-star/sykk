@@ -10,7 +10,7 @@ const database = resolve('.data/analyst.sqlite');
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '/sykk';
 const origin = 'http://127.0.0.1:3011';
 const key = randomUUID();
-const env = { ...process.env, NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_STATIC_EXPORT: '1', ANALYST_SQLITE_PATH: database, FORECAST_JOB_KEY: key, MCP_API_KEY: randomUUID() };
+const env = { ...process.env, AUTH_SQLITE_PATH: '', AUTH_OWNER_PASSWORD: '', NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_STATIC_EXPORT: '1', ANALYST_SQLITE_PATH: database, FORECAST_JOB_KEY: key, MCP_API_KEY: randomUUID() };
 await mkdir(resolve('.data'), { recursive: true });
 await mkdir(output, { recursive: true });
 const server = spawn(process.execPath, ['node_modules/vinext/dist/cli.js', 'start', '--host', '127.0.0.1', '--port', '3011'], { env, stdio: 'inherit', windowsHide: true });
@@ -52,6 +52,8 @@ try {
   }
   await save('/', 'index.html');
   await save('/evaluation', 'evaluation/index.html');
+  await save('/account', 'account/index.html');
+  await save('/admin', 'admin/index.html');
   await save('/sectors/UNKNOWN', '404.html', 404);
   let next = 0;
   await Promise.all(Array.from({ length: 4 }, async () => {
