@@ -19,7 +19,8 @@
     "preview:persistent": "node scripts/preview-persistent.mjs",
     "serve:persistent": "node scripts/serve-persistent.mjs",
     "pages:export": "node --experimental-strip-types scripts/export-pages.mjs",
-    "accounts:owner": "node --experimental-strip-types scripts/create-owner.mjs"
+    "accounts:owner": "node --experimental-strip-types scripts/create-owner.mjs",
+    "accounts:local": "node --experimental-strip-types scripts/accounts-local.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
