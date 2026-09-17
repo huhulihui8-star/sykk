@@ -34,7 +34,8 @@ function similarTitle(a: string, b: string) {
 export function prepareNewsEvidence(events: NewsEvent[], now: number) {
   const clusters: Array<{ title: string; url: string; event: NewsEvent }> = [];
   for (const event of [...events].sort((a, b) => Date.parse(a.publishedAt) - Date.parse(b.publishedAt))) {
-    if (!newsTimeWeight(event, now)) continue;
+    const timestamp = Date.parse(event.publishedAt);
+    if (!Number.isFinite(timestamp) || timestamp > now) continue;
     const title = titleKey(event.title), url = canonicalUrl(event.url);
     const existing = clusters.find(item => (url && item.url === url) || similarTitle(title, item.title));
     if (existing) {
@@ -43,5 +44,5 @@ export function prepareNewsEvidence(events: NewsEvent[], now: number) {
         sectors: [...new Set([...existing.event.sectors, ...event.sectors])] };
     } else clusters.push({ title, url, event: { ...event } });
   }
-  return clusters.map(item => item.event).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+  return clusters.map(item => item.event).filter(event => newsTimeWeight(event, now) > 0).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }

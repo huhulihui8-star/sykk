@@ -42,3 +42,7 @@ test('v11 sector scoring discounts old news and does not amplify syndication', (
   const noQuote = buildSector(definition, [], [event(0)], 'CN', freshness);
   assert.equal(noQuote.nextSessionDirection, null);
 });
+
+test('reposting cannot revive an event older than the scoring window', () => {
+  assert.equal(prepareNewsEvidence([event(200), event(0, { source: 'repost' })], now).length, 0);
+});
