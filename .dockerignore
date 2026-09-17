@@ -1,0 +1,17 @@
+node_modules
+.git
+.env*
+!.env.example
+.secrets
+.data
+.next
+.wrangler
+.vinext
+.workbuddy
+outputs
+work
+dist
+*.tgz
+*.tar.gz
+*.tsbuildinfo
+.wbapp_*.genie

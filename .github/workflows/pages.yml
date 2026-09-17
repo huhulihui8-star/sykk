@@ -1,0 +1,66 @@
+name: Update analyst Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '7,37 * * * *'
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: analyst-pages
+  cancel-in-progress: false
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Restore durable forecast archive
+        run: |
+          mkdir -p .data
+          if git fetch origin analyst-state:refs/remotes/origin/analyst-state; then
+            git show FETCH_HEAD:analyst.sqlite > .data/analyst.sqlite
+          fi
+      - run: npm run check
+      - run: node scripts/build-pages.mjs
+      - run: npm run pages:export
+      - name: Save forecast archive
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if git show-ref --verify --quiet refs/remotes/origin/analyst-state; then
+            git worktree add state origin/analyst-state
+          else
+            git worktree add --detach state
+            cd state
+            git checkout --orphan analyst-state
+            git rm -rf .
+            cd ..
+          fi
+          cp .data/analyst.sqlite state/analyst.sqlite
+          cd state
+          git add analyst.sqlite
+          if ! git diff --cached --quiet; then
+            git commit -m 'Archive public market data and forecasts'
+            git push origin HEAD:analyst-state
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

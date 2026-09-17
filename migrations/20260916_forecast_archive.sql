@@ -1,0 +1,4 @@
+-- Additive forecast tables. Same statements as runtime ensureSchema; no existing table changes.
+CREATE TABLE IF NOT EXISTS forecast_archive (id TEXT PRIMARY KEY, sector_code TEXT NOT NULL, session TEXT NOT NULL, decision_date TEXT NOT NULL, target_date TEXT NOT NULL, captured_at TEXT NOT NULL, model_version TEXT NOT NULL, direction TEXT NOT NULL, baseline_direction TEXT, base_close REAL NOT NULL, source TEXT NOT NULL, payload TEXT NOT NULL, UNIQUE(sector_code, decision_date, model_version));
+CREATE TABLE IF NOT EXISTS forecast_results (forecast_id TEXT PRIMARY KEY, evaluated_at TEXT NOT NULL, target_date TEXT NOT NULL, actual_change REAL NOT NULL, actual_direction TEXT, model_hit INTEGER, baseline_hit INTEGER, source TEXT NOT NULL, FOREIGN KEY(forecast_id) REFERENCES forecast_archive(id));
+CREATE INDEX IF NOT EXISTS idx_forecast_archive_target_date ON forecast_archive(target_date);
